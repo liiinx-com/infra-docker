@@ -1,0 +1,195 @@
+services:
+  db:
+    container_name: liiinx_pg_container
+    image: postgres:17
+    restart: no
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: liiinx_db
+    volumes:
+      - local_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d liiinx_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - liiinx_network
+
+  pgadmin:
+    container_name: liiinx_pgadmin4_container
+    image: dpage/pgadmin4:latest
+    restart: no
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
+    volumes:
+      - local_pgadmin_data:/var/lib/pgadmin
+    networks:
+      - liiinx_network
+
+  localstack:
+    container_name: liiinx_localstack_container
+    image: localstack/localstack:latest
+    restart: no
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      - SERVICES=sns,sqs
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-2
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./localstack-init:/etc/localstack/init/ready.d
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - liiinx_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    container_name: liiinx_mongodb_container
+    image: mongo:6-jammy
+    restart: no
+    ports:
+      - "27017:27017"
+    volumes:
+      - local_mongodb_data:/data/db
+    networks:
+      - liiinx_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    container_name: liiinx_redis_container
+    image: redis/redis-stack-server:latest
+    restart: no
+    ports:
+      - "6379:6379"
+    volumes:
+      - local_redis_data:/data
+    networks:
+      - liiinx_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # db:
+  #   container_name: pg_container
+  #   image: postgres
+  #   restart: no
+  #   environment:
+  #     POSTGRES_USER: root
+  #     POSTGRES_PASSWORD: root
+  #   volumes:
+  #     # - ./db-scripts/create-db.sql:/docker-entrypoint-initdb.d/create-db.sql
+  #     # - ./db-scripts:/docker-entrypoint-initdb.d
+  #     - local_pgdata:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+  # youtube-api:
+  #   build:
+  #     context: ../YouTube-operational-api
+  #     dockerfile: ../YouTube-operational-api/Dockerfile
+  #   container_name: youtube-api
+  #   restart: on-failure
+  #   ports:
+  #     - 3002:80
+
+  # rabbit:
+  #   image: rabbitmq:3-management-alpine
+  #   container_name: 'rabbitmq'
+  #   ports:
+  #     - 5672:5672
+  #     - 15672:15672
+  #   volumes:
+  #     - ./rabbitmq/data/:/var/lib/rabbitmq/
+  #     - ./rabbitmq/log/:/var/log/rabbitmq
+
+  # raefik:
+  #   image: "traefik"
+  #   restart: always
+  #   command:
+  #     - "--api.insecure=true"
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entrypoints.web.address=:80"
+  #     - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+  #     - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+  #     - "--entrypoints.websecure.address=:443"
+  #     - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
+  #     - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
+  #     - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - traefik_data:/letsencrypt
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # n8n:
+  #   image: docker.n8n.io/n8nio/n8n
+  #   restart: always
+  #   ports:
+  #     - "127.0.0.1:5678:5678"
+  #   labels:
+  #     - traefik.enable=true
+  #     - traefik.http.routers.n8n.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`)
+  #     - traefik.http.routers.n8n.tls=true
+  #     - traefik.http.routers.n8n.entrypoints=web,websecure
+  #     - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
+  #     - traefik.http.middlewares.n8n.headers.SSLRedirect=true
+  #     - traefik.http.middlewares.n8n.headers.STSSeconds=315360000
+  #     - traefik.http.middlewares.n8n.headers.browserXSSFilter=true
+  #     - traefik.http.middlewares.n8n.headers.contentTypeNosniff=true
+  #     - traefik.http.middlewares.n8n.headers.forceSTSHeader=true
+  #     - traefik.http.middlewares.n8n.headers.SSLHost=${DOMAIN_NAME}
+  #     - traefik.http.middlewares.n8n.headers.STSIncludeSubdomains=true
+  #     - traefik.http.middlewares.n8n.headers.STSPreload=true
+  #     - traefik.http.routers.n8n.middlewares=n8n@docker
+  #   environment:
+  #     - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
+  #     - N8N_PORT=5678
+  #     - N8N_PROTOCOL=https
+  #     - NODE_ENV=production
+  #     - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
+  #     - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+  #   volumes:
+  #     - n8n_data:/home/node/.n8n
+  #     - ./local-files:/files
+
+volumes:
+  #   n8n_data:
+  #   traefik_data:
+  local_pgdata:
+  local_pgadmin_data:
+  localstack_data:
+  local_mongodb_data:
+  local_redis_data:
+
+networks:
+  liiinx_network:
+    driver: bridge
+    name: liiinx_network

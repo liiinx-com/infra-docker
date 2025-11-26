@@ -1,0 +1,21 @@
+version: "3.5"
+services:
+  worker:
+    build:
+      context: ../liiinx-api
+      dockerfile: ../liiinx-api/Dockerfile
+    container_name: worker
+    ports:
+      - "3002:3002"
+    volumes:
+      - ../liiinx-api:/app
+      - api_node_modules:/app/node_modules
+    environment:
+      IS_WORKER: TRUE
+volumes:
+  www_node_modules:
+  app_node_modules:
+  api_node_modules:
+# networks:
+#   default:
+#     driver: bridge
