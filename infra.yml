@@ -7,6 +7,8 @@ services:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: root
       POSTGRES_DB: liiinx_db
+      TZ: UTC
+    command: postgres -c timezone=UTC
     volumes:
       - local_pgdata:/var/lib/postgresql/data
     ports:
